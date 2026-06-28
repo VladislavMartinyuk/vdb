@@ -3,17 +3,15 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <future>
-#include <memory>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
 
-namespace vdb {
+#include "pooltask.h"
 
-using Task = std::function<void()>;
+namespace vdb {
 
 class ThreadPool
 {
@@ -32,16 +30,16 @@ public:
         auto packagedTask = std::make_shared<std::packaged_task<ReturnType()>>(
             [f = std::forward<Func>(func), ... args = std::forward<Args>(args)]() mutable {
                 if constexpr (std::is_void_v<ReturnType>) {
-                    std::invoke(f, args...);
+                    std::invoke(std::move(f), std::move(args)...);
                 } else {
-                    auto result = std::invoke(f, args...);
+                    auto result = std::invoke(std::move(f), std::move(args)...);
                     return result;
                 }
             });
 
         auto future = packagedTask->get_future();
 
-        auto task = Task{[ptask = packagedTask]() mutable { (*ptask)(); }};
+        PoolTask task([ptask = std::move(packagedTask)]() { (*ptask)(); });
         {
             std::unique_lock lock(m_mutex);
             m_queue.push(std::move(task));
@@ -52,19 +50,19 @@ public:
     }
 
     template<typename Func, typename Callback, typename... Args>
-    void enqueuWithCallback(Func &&func, Callback &&cb, Args &&...args)
+    void enqueueWithCallback(Func &&func, Callback &&cb, Args &&...args)
     {
         using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
 
-        auto task = Task{[f = std::forward<Func>(func),
+        auto task = PoolTask{[f = std::forward<Func>(func),
                           cb = std::forward<Callback>(cb),
                           ... args = std::forward<Args>(args)]() mutable {
             if constexpr (std::is_void_v<ReturnType>) {
-                f(args...);
-                cb();
+                std::invoke(std::move(f), std::move(args)...);
+                std::invoke(std::move(cb));
             } else {
-                auto result = f(args...);
-                cb(std::move(result));
+                auto result = std::invoke(std::move(f), std::move(args)...);
+                std::invoke(std::move(cb), std::move(result));
             }
         }};
 
@@ -77,10 +75,10 @@ public:
 
 private:
     mutable std::mutex m_mutex;
-    std::queue<Task> m_queue;
+    std::queue<PoolTask> m_queue;
     std::condition_variable m_cv;
     std::vector<std::thread> m_workers;
-    std::atomic_bool m_isStoped{false};
+    std::atomic_bool m_isStopped{false};
 };
 
 } // namespace vdb

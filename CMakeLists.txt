@@ -6,7 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(vdb LANGUAGES CXX)
 
 add_executable(vdb vdb/main.cpp
-    vdb/threadpool.h vdb/threadpool.cpp
+        vdb/core/threadpool.h vdb/core/threadpool.cpp
+        vdb/core/corotask.h
+        vdb/core/pooltask.h
+        vdb/core/sqlquerybuilder.h
+        vdb/core/sqlresponse.cpp
+        vdb/core/sqlresponse.h
 )
 
 target_include_directories(vdb PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

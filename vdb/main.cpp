@@ -1,16 +1,17 @@
-#include "threadpool.h"
+#include "vdb/core/threadpool.h"
 
+#include "vdb/core/corotask.h"
 #include <iostream>
+
+#include <string>
+#include <vector>
+
+#include <functional>
+#include <memory>
+
 
 int main()
 {
-    vdb::ThreadPool pool(std::thread::hardware_concurrency());
 
-    pool.enqueuWithCallback([](const std::string &text) { return text; },
-                            [](const std::string &text) { std::cout << text; },
-                            std::string("Hello world"));
-
-    auto future = pool.enqueue([](const std::string &text) { return text; }, std::string{"text"});
-
-    std::cout << future.get() << std::endl;
+    return 0;
 }
